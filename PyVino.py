@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
 from scipy import interpolate
+from BaselineRemoval import BaselineRemoval
 
 
 class vinoPCA:
@@ -43,18 +44,31 @@ class vinoPCA:
         nm = Data[:, 1]
         cm = 1 / (632.8e-9) - 1 / (nm * 1e-9)
         size = np.ma.size(Data, 1)
-        filt_datas = np.zeros(shape=(950, size - 1))
+        polynomial_degree = 100
+        filtered_datas = np.zeros(shape=(800, size - 1))
+
+        # for column in range(2, size):
+        #     y = Data[:, column]
+        #     d = 25
+        #     f2 = interpolate.interp1d(cm[199:][::d], y[199:][::d], kind='quadratic')
+        #     y = y[200:1000] - f2(cm[200:1000])
+        #     y = (y - min(y)) / max(y - min(y))
+        #     filt_datas[:, column - 1] = y
+        # filt_datas[:, 0] = cm[200:1000]
 
         for column in range(2, size):
-            y = Data[:, column]
-            d = 25
-            f2 = interpolate.interp1d(cm[20:1040][::d], y[20:1040][::d], kind='quadratic')
-            y = y[50:1000] - f2(cm[50:1000])
-            y = (y - min(y)) / max(y - min(y))
-            filt_datas[:, column - 1] = y
-        filt_datas[:, 0] = cm[50:1000]
+            spectre = Data[200:1000, column]
+            baseObj = BaselineRemoval(spectre)
+            values = baseObj.IModPoly(polynomial_degree)
+            # values = values - min(values) # Si tu normalises, tu perds les composants communs (Alcool particulèrement)
+            # values = values/max(values)   # tu perds aussi le degrés de présence (Plus ou moins bouchonné ?)
+                                            # Si tu normalises pas, tu favorises les composants communs présents à
+                                            # différents degrés (Plus ou moins d'alcool). Donc tester avec et sans?
+            filtered_datas[:, column - 1] = values
 
-        return filt_datas
+        filtered_datas[:, 0] = Data[200:1000, 1]
+
+        return filtered_datas
 
     def doPCA(self, n:int):
 
@@ -117,6 +131,15 @@ class vinoPCA:
         """
         pass
 
+    def getAllEigenvectors(self):
+
+        """
+        Function to get all of the eigenvectors created
+        :return: an array of n eigenvector
+        """
+
+        return self.X_PCA.components_.transpose()
+
     def showEigenvectors(self):
 
         """
@@ -165,10 +188,10 @@ class vinoPCA:
 if __name__ == "__main__":
 
     iterable = [31, 30, 30, 30, 80, 31, 33, 31, 30, 30, 30, 30, 30, 30, 30, 30, 104, 30, 30] # sans vin blanc parceque ça shit le aspect ratio
-    Data = np.genfromtxt('DataVino_Sorted.csv', delimiter=',')
+    Data = np.genfromtxt('/Users/Shooshoo/PycharmProjects/PCA_DCCLab/DataVino_Sorted.csv', delimiter=',')
 
     my_Spectrums = vinoPCA(Data, iterable)
-    my_Spectrums.doPCA(3)
+    my_Spectrums.doPCA(10)
     my_Spectrums.showTransformedData3D()
     my_Spectrums.showTransformedData2D()
     my_Spectrums.showEigenvectors()
